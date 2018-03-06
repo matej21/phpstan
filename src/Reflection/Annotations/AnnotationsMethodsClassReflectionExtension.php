@@ -6,6 +6,7 @@ use PHPStan\Reflection\ClassReflection;
 use PHPStan\Reflection\MethodReflection;
 use PHPStan\Reflection\MethodsClassReflectionExtension;
 use PHPStan\Type\FileTypeMapper;
+use PHPStan\Type\MixedType;
 
 class AnnotationsMethodsClassReflectionExtension implements MethodsClassReflectionExtension
 {
@@ -69,7 +70,7 @@ class AnnotationsMethodsClassReflectionExtension implements MethodsClassReflecti
 			return $methods;
 		}
 
-		$resolvedPhpDoc = $this->fileTypeMapper->getResolvedPhpDoc($fileName, $classReflection->getName(), $docComment);
+		$resolvedPhpDoc = $this->fileTypeMapper->getResolvedPhpDoc($fileName, $classReflection, $docComment);
 		foreach ($resolvedPhpDoc->getMethodTags() as $methodName => $methodTag) {
 			$parameters = [];
 			foreach ($methodTag->getParameters() as $parameterName => $parameterTag) {

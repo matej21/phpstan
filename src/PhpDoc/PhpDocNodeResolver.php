@@ -3,6 +3,8 @@
 namespace PHPStan\PhpDoc;
 
 use PHPStan\Analyser\NameScope;
+use PHPStan\PhpDoc\Tag\GenericTag;
+use PHPStan\PhpDoc\Tag\InheritTag;
 use PHPStan\PhpDoc\Tag\MethodTag;
 use PHPStan\PhpDoc\Tag\MethodTagParameter;
 use PHPStan\PhpDoc\Tag\ParamTag;
@@ -34,6 +36,8 @@ class PhpDocNodeResolver
 			$this->resolveMethodTags($phpDocNode, $nameScope),
 			$this->resolvePropertyTags($phpDocNode, $nameScope),
 			$this->resolveParamTags($phpDocNode, $nameScope),
+			$this->resolveGenericTag($phpDocNode, $nameScope),
+			$this->resolveInheritTag($phpDocNode, $nameScope),
 			$this->resolveReturnTag($phpDocNode, $nameScope)
 		);
 	}
@@ -187,6 +191,52 @@ class PhpDocNodeResolver
 		}
 
 		return null;
+	}
+
+
+	/**
+	 * @param PhpDocNode $phpDocNode
+	 * @param NameScope  $nameScope
+	 * @return \PHPStan\PhpDoc\Tag\GenericTag[]
+	 */
+	private function resolveGenericTag(PhpDocNode $phpDocNode, NameScope $nameScope): array
+	{
+		$resolved = [];
+		foreach ($phpDocNode->getGenericTagValues() as $tagValue) {
+			$resolved[$tagValue->name] = new GenericTag(
+				$tagValue->constraint ? $this->typeNodeResolver->resolve($tagValue->constraint, $nameScope) : null,
+				$tagValue->constraintType,
+				$tagValue->varianceType
+			);
+		}
+
+		return $resolved;
+	}
+
+
+	/**
+	 * @return \PHPStan\PhpDoc\Tag\InheritTag[]
+	 */
+	private function resolveInheritTag(PhpDocNode $phpDocNode, NameScope $nameScope): array
+	{
+		$resolved = [];
+		foreach ($phpDocNode->getExtendsTagValues() as $tagValue) {
+			$types = [];
+			foreach ($tagValue->type->genericTypes as $genericType) {
+				$types[] = $this->typeNodeResolver->resolve($genericType, $nameScope);
+			}
+			$resolved[$tagValue->type->type->name] = new InheritTag('extends', $types);
+		}
+
+		foreach ($phpDocNode->getExtendsTagValues() as $tagValue) {
+			$types = [];
+			foreach ($tagValue->type->genericTypes as $genericType) {
+				$types[] = $this->typeNodeResolver->resolve($genericType, $nameScope);
+			}
+			$resolved[$tagValue->type->type->name] = new InheritTag('implements', $types);
+		}
+
+		return $resolved;
 	}
 
 }

@@ -61,7 +61,8 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
 	 */
 	public function createBroker(
 		array $dynamicMethodReturnTypeExtensions = [],
-		array $dynamicStaticMethodReturnTypeExtensions = []
+		array $dynamicStaticMethodReturnTypeExtensions = [],
+		array $genericTypesReflectionExtensions = []
 	): Broker
 	{
 		$functionCallStatementFinder = new FunctionCallStatementFinder();
@@ -166,6 +167,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
 				new PhpDefectClassReflectionExtension($this->getContainer()->getByType(TypeStringResolver::class)),
 			],
 			[$phpExtension],
+			$genericTypesReflectionExtensions,
 			$dynamicMethodReturnTypeExtensions,
 			$dynamicStaticMethodReturnTypeExtensions,
 			$tagToService($this->getContainer()->findByTag(BrokerFactory::DYNAMIC_FUNCTION_RETURN_TYPE_EXTENSION_TAG)),

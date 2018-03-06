@@ -21,6 +21,9 @@ class Broker
 	/** @var \PHPStan\Reflection\MethodsClassReflectionExtension[] */
 	private $methodsClassReflectionExtensions;
 
+	/** @var \PHPStan\Reflection\GenericClassReflectionExtension[] */
+	private $genericTypeReflectionExtensions;
+
 	/** @var \PHPStan\Type\DynamicMethodReturnTypeExtension[] */
 	private $dynamicMethodReturnTypeExtensions = [];
 
@@ -65,17 +68,19 @@ class Broker
 
 	/**
 	 * @param \PHPStan\Reflection\PropertiesClassReflectionExtension[] $propertiesClassReflectionExtensions
-	 * @param \PHPStan\Reflection\MethodsClassReflectionExtension[] $methodsClassReflectionExtensions
-	 * @param \PHPStan\Type\DynamicMethodReturnTypeExtension[] $dynamicMethodReturnTypeExtensions
-	 * @param \PHPStan\Type\DynamicStaticMethodReturnTypeExtension[] $dynamicStaticMethodReturnTypeExtensions
-	 * @param \PHPStan\Type\DynamicFunctionReturnTypeExtension[] $dynamicFunctionReturnTypeExtensions
-	 * @param \PHPStan\Reflection\FunctionReflectionFactory $functionReflectionFactory
-	 * @param \PHPStan\Type\FileTypeMapper $fileTypeMapper
-	 * @param \PHPStan\Reflection\SignatureMap\FunctionDumper $functionDumper
+	 * @param \PHPStan\Reflection\MethodsClassReflectionExtension[]    $methodsClassReflectionExtensions
+	 * @param \PHPStan\Reflection\GenericClassReflectionExtension[]    $genericTypeReflectionExtensions
+	 * @param \PHPStan\Type\DynamicMethodReturnTypeExtension[]         $dynamicMethodReturnTypeExtensions
+	 * @param \PHPStan\Type\DynamicStaticMethodReturnTypeExtension[]   $dynamicStaticMethodReturnTypeExtensions
+	 * @param \PHPStan\Type\DynamicFunctionReturnTypeExtension[]       $dynamicFunctionReturnTypeExtensions
+	 * @param \PHPStan\Reflection\FunctionReflectionFactory            $functionReflectionFactory
+	 * @param \PHPStan\Type\FileTypeMapper                             $fileTypeMapper
+	 * @param \PHPStan\Reflection\SignatureMap\FunctionDumper          $functionDumper
 	 */
 	public function __construct(
 		array $propertiesClassReflectionExtensions,
 		array $methodsClassReflectionExtensions,
+		array $genericTypeReflectionExtensions,
 		array $dynamicMethodReturnTypeExtensions,
 		array $dynamicStaticMethodReturnTypeExtensions,
 		array $dynamicFunctionReturnTypeExtensions,
@@ -86,6 +91,7 @@ class Broker
 	{
 		$this->propertiesClassReflectionExtensions = $propertiesClassReflectionExtensions;
 		$this->methodsClassReflectionExtensions = $methodsClassReflectionExtensions;
+		$this->genericTypeReflectionExtensions = $genericTypeReflectionExtensions;
 		foreach (array_merge($propertiesClassReflectionExtensions, $methodsClassReflectionExtensions, $dynamicMethodReturnTypeExtensions, $dynamicStaticMethodReturnTypeExtensions, $dynamicFunctionReturnTypeExtensions) as $extension) {
 			if ($extension instanceof BrokerAwareExtension) {
 				$extension->setBroker($this);
@@ -176,45 +182,60 @@ class Broker
 		return $extensionsForClass;
 	}
 
-	public function getClass(string $className): \PHPStan\Reflection\ClassReflection
+
+	/**
+	 * @param Type[] $genericTypes
+	 */
+	public function getClass(string $className, array $genericTypes = []): \PHPStan\Reflection\ClassReflection
 	{
 		if (!$this->hasClass($className)) {
 			throw new \PHPStan\Broker\ClassNotFoundException($className);
 		}
 
-		if (!isset($this->classReflections[$className])) {
+		$key = serialize([$className, $genericTypes]);
+
+		if (!isset($this->classReflections[$key])) {
 			$reflectionClass = new ReflectionClass($className);
 			$classReflection = $this->getClassFromReflection(
 				$reflectionClass,
 				$reflectionClass->getName(),
-				$reflectionClass->isAnonymous()
+				$reflectionClass->isAnonymous(),
+				$genericTypes
 			);
-			$this->classReflections[$className] = $classReflection;
+			$this->classReflections[$key] = $classReflection;
 			if ($className !== $reflectionClass->getName()) {
 				// class alias optimization
-				$this->classReflections[$reflectionClass->getName()] = $classReflection;
+				$key = serialize([$className, $genericTypes]);
+				$this->classReflections[$key] = $classReflection;
 			}
 		}
 
-		return $this->classReflections[$className];
+		return $this->classReflections[$key];
 	}
 
-	public function getClassFromReflection(\ReflectionClass $reflectionClass, string $displayName, bool $anonymous): \PHPStan\Reflection\ClassReflection
+
+	/**
+	 * @param Type[] $genericTypes
+	 */
+	public function getClassFromReflection(\ReflectionClass $reflectionClass, string $displayName, bool $anonymous, array $genericTypes): \PHPStan\Reflection\ClassReflection
 	{
-		$className = $reflectionClass->getName();
-		if (!isset($this->classReflections[$className])) {
+		$key = serialize([$reflectionClass->getName(), $genericTypes]);
+
+		if (!isset($this->classReflections[$key])) {
 			$classReflection = new ClassReflection(
 				$this,
 				$this->propertiesClassReflectionExtensions,
 				$this->methodsClassReflectionExtensions,
+				$this->genericTypeReflectionExtensions,
 				$displayName,
 				$reflectionClass,
-				$anonymous
+				$anonymous,
+				$genericTypes
 			);
-			$this->classReflections[$className] = $classReflection;
+			$this->classReflections[$key] = $classReflection;
 		}
 
-		return $this->classReflections[$className];
+		return $this->classReflections[$key];
 	}
 
 	public function hasClass(string $className): bool

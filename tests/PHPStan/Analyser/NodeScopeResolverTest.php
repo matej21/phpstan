@@ -990,6 +990,10 @@ class NodeScopeResolverTest extends \PHPStan\Testing\TestCase
 				'static(VarAnnotations\Foo)',
 				'$static',
 			],
+			[
+				'VarAnnotations\Collection<VarAnnotations\Product>',
+				'$generic',
+			]
 		];
 	}
 
@@ -3764,7 +3768,7 @@ class NodeScopeResolverTest extends \PHPStan\Testing\TestCase
 				'$iterableWithTooManyArgs',
 			],
 			[
-				'mixed',
+				'Foo<int>',
 				'$genericFoo',
 			],
 		];

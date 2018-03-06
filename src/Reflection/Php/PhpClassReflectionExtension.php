@@ -99,7 +99,7 @@ class PhpClassReflectionExtension
 	{
 		$propertyReflection = $classReflection->getNativeReflection()->getProperty($propertyName);
 		$propertyName = $propertyReflection->getName();
-		$declaringClassReflection = $this->broker->getClass($propertyReflection->getDeclaringClass()->getName());
+		$declaringClassReflection = $classReflection->getSuperTypes($propertyReflection->getDeclaringClass()->getName())[0];
 
 		if ($includingAnnotations && $this->annotationsPropertiesClassReflectionExtension->hasProperty($classReflection, $propertyName)) {
 			$hierarchyDistances = $classReflection->getClassHierarchyDistances();
@@ -126,9 +126,11 @@ class PhpClassReflectionExtension
 				$declaringClassReflection->getFileName()
 			);
 
+			$phpDocClassReflection = $declaringClassReflection->getSuperTypes($phpDocBlock->getClass())[0];
+
 			$resolvedPhpDoc = $this->fileTypeMapper->getResolvedPhpDoc(
 				$phpDocBlock->getFile(),
-				$phpDocBlock->getClass(),
+				$phpDocClassReflection,
 				$phpDocBlock->getDocComment()
 			);
 			$varTags = $resolvedPhpDoc->getVarTags();
@@ -210,7 +212,8 @@ class PhpClassReflectionExtension
 				return $annotationMethod;
 			}
 		}
-		$declaringClass = $this->broker->getClass($methodReflection->getDeclaringClass()->getName());
+
+		$declaringClass = $classReflection->getSuperTypes($methodReflection->getDeclaringClass()->getName())[0];
 
 		$phpDocParameterTypes = [];
 		$phpDocReturnType = null;
@@ -224,9 +227,11 @@ class PhpClassReflectionExtension
 					$declaringClass->getFileName()
 				);
 
+				$phpDocClassReflection = $declaringClass->getSuperTypes($phpDocBlock->getClass())[0];
+
 				$resolvedPhpDoc = $this->fileTypeMapper->getResolvedPhpDoc(
 					$phpDocBlock->getFile(),
-					$phpDocBlock->getClass(),
+					$phpDocClassReflection,
 					$phpDocBlock->getDocComment()
 				);
 				$phpDocParameterTypes = array_map(function (ParamTag $tag): Type {

@@ -8,7 +8,7 @@ use PHPStan\Reflection\MethodReflection;
 use PHPStan\Reflection\PropertyReflection;
 use PHPStan\TrinaryLogic;
 
-class IntersectionType implements CompoundType, StaticResolvableType
+class IntersectionType implements CompoundType, StaticResolvableType, ResolvableGenericType
 {
 
 	/** @var \PHPStan\Type\Type[] */
@@ -235,6 +235,11 @@ class IntersectionType implements CompoundType, StaticResolvableType
 	public function changeBaseClass(string $className): StaticResolvableType
 	{
 		return new self(UnionTypeHelper::changeBaseClass($className, $this->getTypes()));
+	}
+
+	public function resolveGenericType(array $genericTypesMap): Type
+	{
+		return new self(UnionTypeHelper::resolveGenericTypes($genericTypesMap, $this->getTypes()));
 	}
 
 	public static function __set_state(array $properties): Type

@@ -8,7 +8,7 @@ use PHPStan\Type\Constant\ConstantStringType;
 use PHPStan\Type\Traits\MaybeCallableTypeTrait;
 use PHPStan\Type\Traits\NonObjectTypeTrait;
 
-class ArrayType implements StaticResolvableType
+class ArrayType implements StaticResolvableType, ResolvableGenericType
 {
 
 	use MaybeCallableTypeTrait;
@@ -132,6 +132,19 @@ class ArrayType implements StaticResolvableType
 			);
 		}
 
+		return $this;
+	}
+
+	public function resolveGenericType(array $genericTypesMap): Type
+	{
+		$type = $this->getItemType();
+		if ($type instanceof ResolvableGenericType) {
+			return new self(
+				$this->keyType,
+				$type->resolveGenericType($genericTypesMap),
+				$this->isItemTypeInferredFromLiteralArray()
+			);
+		}
 		return $this;
 	}
 

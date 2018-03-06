@@ -7,12 +7,12 @@ class FileTypeMapperTest extends \PHPStan\Testing\TestCase
 
 	public function testGetResolvedPhpDoc(): void
 	{
-		$this->createBroker();
+		$broker = $this->createBroker();
 
 		/** @var FileTypeMapper $fileTypeMapper */
 		$fileTypeMapper = $this->getContainer()->getByType(FileTypeMapper::class);
 
-		$resolvedA = $fileTypeMapper->getResolvedPhpDoc(__DIR__ . '/data/annotations.php', 'Foo', '/**
+		$resolvedA = $fileTypeMapper->getResolvedPhpDoc(__DIR__ . '/data/annotations.php', $broker->getClass('Foo'), '/**
  * @property int | float $numericBazBazProperty
  * @property X $singleLetterObjectName
  *
@@ -82,7 +82,7 @@ class FileTypeMapperTest extends \PHPStan\Testing\TestCase
 
 	public function testFileWithDependentPhpDocs(): void
 	{
-		$this->createBroker();
+		$broker = $this->createBroker();
 
 		/** @var FileTypeMapper $fileTypeMapper */
 		$fileTypeMapper = $this->getContainer()->getByType(FileTypeMapper::class);
@@ -94,7 +94,7 @@ class FileTypeMapperTest extends \PHPStan\Testing\TestCase
 
 		$resolved = $fileTypeMapper->getResolvedPhpDoc(
 			$realpath,
-			\DependentPhpDocs\Foo::class,
+			$broker->getClass(\DependentPhpDocs\Foo::class),
 			'/** @param Foo[]|Foo|\Iterator $pages */'
 		);
 
@@ -108,7 +108,7 @@ class FileTypeMapperTest extends \PHPStan\Testing\TestCase
 
 	public function testFileWithCyclicPhpDocs(): void
 	{
-		$this->getContainer()->getByType(\PHPStan\Broker\Broker::class);
+		$broker = $this->getContainer()->getByType(\PHPStan\Broker\Broker::class);
 
 		/** @var FileTypeMapper $fileTypeMapper */
 		$fileTypeMapper = $this->getContainer()->getByType(FileTypeMapper::class);
@@ -120,7 +120,7 @@ class FileTypeMapperTest extends \PHPStan\Testing\TestCase
 
 		$resolved = $fileTypeMapper->getResolvedPhpDoc(
 			$realpath,
-			\CyclicPhpDocs\Foo::class,
+			$broker->getClass(\CyclicPhpDocs\Foo::class),
 			'/** @return iterable<Foo> | Foo */'
 		);
 

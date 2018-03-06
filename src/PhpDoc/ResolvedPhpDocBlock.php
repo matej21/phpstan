@@ -2,7 +2,15 @@
 
 namespace PHPStan\PhpDoc;
 
+use PHPStan\PhpDoc\Tag\GenericTag;
+use PHPStan\PhpDoc\Tag\InheritTag;
+use PHPStan\PhpDoc\Tag\MethodTag;
+use PHPStan\PhpDoc\Tag\MethodTagParameter;
+use PHPStan\PhpDoc\Tag\ParamTag;
+use PHPStan\PhpDoc\Tag\PropertyTag;
 use PHPStan\PhpDoc\Tag\ReturnTag;
+use PHPStan\PhpDoc\Tag\VarTag;
+use PHPStan\Type\ResolvableGenericType;
 
 class ResolvedPhpDocBlock
 {
@@ -28,15 +36,28 @@ class ResolvedPhpDocBlock
 	private $paramTags;
 
 	/**
+	 * @var \PHPStan\PhpDoc\Tag\GenericTag[]
+	 */
+	private $genericTags;
+
+	/**
+	 * @var \PHPStan\PhpDoc\Tag\InheritTag[]
+	 */
+	private $inheritTags;
+
+	/**
 	 * @var \PHPStan\PhpDoc\Tag\ReturnTag|null
 	 */
 	private $returnTag;
+
 
 	/**
 	 * @param \PHPStan\PhpDoc\Tag\VarTag[] $varTags
 	 * @param \PHPStan\PhpDoc\Tag\MethodTag[] $methodTags
 	 * @param \PHPStan\PhpDoc\Tag\PropertyTag[] $propertyTags
 	 * @param \PHPStan\PhpDoc\Tag\ParamTag[] $paramTags
+	 * @param \PHPStan\PhpDoc\Tag\GenericTag[] $genericTags
+	 * @param \PHPStan\PhpDoc\Tag\InheritTag[] $inheritTags
 	 * @param \PHPStan\PhpDoc\Tag\ReturnTag|null $returnTag
 	 */
 	private function __construct(
@@ -44,6 +65,8 @@ class ResolvedPhpDocBlock
 		array $methodTags,
 		array $propertyTags,
 		array $paramTags,
+		array $genericTags,
+		array $inheritTags,
 		?ReturnTag $returnTag
 	)
 	{
@@ -51,6 +74,8 @@ class ResolvedPhpDocBlock
 		$this->methodTags = $methodTags;
 		$this->propertyTags = $propertyTags;
 		$this->paramTags = $paramTags;
+		$this->genericTags = $genericTags;
+		$this->inheritTags = $inheritTags;
 		$this->returnTag = $returnTag;
 	}
 
@@ -59,6 +84,8 @@ class ResolvedPhpDocBlock
 	 * @param \PHPStan\PhpDoc\Tag\MethodTag[] $methodTags
 	 * @param \PHPStan\PhpDoc\Tag\PropertyTag[] $propertyTags
 	 * @param \PHPStan\PhpDoc\Tag\ParamTag[] $paramTags
+	 * @param \PHPStan\PhpDoc\Tag\GenericTag[] $genericTags
+	 * @param \PHPStan\PhpDoc\Tag\InheritTag[] $inheritTags
 	 * @param \PHPStan\PhpDoc\Tag\ReturnTag|null $returnTag
 	 * @return self
 	 */
@@ -67,15 +94,17 @@ class ResolvedPhpDocBlock
 		array $methodTags,
 		array $propertyTags,
 		array $paramTags,
+		array $genericTags,
+		array $inheritTags,
 		?ReturnTag $returnTag
 	): self
 	{
-		return new self($varTags, $methodTags, $propertyTags, $paramTags, $returnTag);
+		return new self($varTags, $methodTags, $propertyTags, $paramTags, $genericTags, $inheritTags, $returnTag);
 	}
 
 	public static function createEmpty(): self
 	{
-		return new self([], [], [], [], null);
+		return new self([], [], [], [], [], [], null);
 	}
 
 
@@ -111,10 +140,124 @@ class ResolvedPhpDocBlock
 		return $this->paramTags;
 	}
 
+
+	/**
+	 * @return \PHPStan\PhpDoc\Tag\GenericTag[]
+	 */
+	public function getGenericTags(): array
+	{
+		return $this->genericTags;
+	}
+
+
+	/**
+	 * @return \PHPStan\PhpDoc\Tag\InheritTag[]
+	 */
+	public function getInheritTags(): array
+	{
+		return $this->inheritTags;
+	}
+
+
 	public function getReturnTag(): ?\PHPStan\PhpDoc\Tag\ReturnTag
 	{
 		return $this->returnTag;
 	}
+
+
+	public function resolveGenericTypes(array $genericTypesMap): self
+	{
+		$varTags = $this->varTags;
+		foreach ($this->varTags as $varName => $varTag) {
+			$type = $varTag->getType();
+			if ($type instanceof ResolvableGenericType) {
+				$varTags[$varName] = new VarTag($type->resolveGenericType($genericTypesMap));
+			}
+		}
+
+		$methodTags = $this->methodTags;
+		foreach ($methodTags as $methodName => $methodTag) {
+			$parameters = $methodTag->getParameters();
+			foreach ($parameters as $parameterName => $parameterTag) {
+				$type = $parameterTag->getType();
+				if ($type instanceof ResolvableGenericType) {
+					$parameters[$parameterName] = new MethodTagParameter(
+						$type->resolveGenericType($genericTypesMap),
+						$parameterTag->isPassedByReference(),
+						$parameterTag->isOptional(),
+						$parameterTag->isVariadic()
+					);
+				}
+			}
+			$type = $methodTag->getReturnType();
+			if ($type instanceof ResolvableGenericType) {
+				$type = $type->resolveGenericType($genericTypesMap);
+			}
+			$methodTags[$methodName] = new MethodTag($type, $methodTag->isStatic(), $parameters);
+		}
+
+		$propertyTags = $this->propertyTags;
+		foreach ($propertyTags as $propertyName => $propertyTag) {
+			$type = $propertyTag->getType();
+			if ($type instanceof ResolvableGenericType) {
+				$propertyTags[$propertyName] = new PropertyTag(
+					$type->resolveGenericType($genericTypesMap),
+					$propertyTag->isReadable(),
+					$propertyTag->isWritable()
+				);
+			}
+		}
+
+		$paramTags = $this->paramTags;
+		foreach ($paramTags as $paramName => $paramTag) {
+			$type = $paramTag->getType();
+			if ($type instanceof ResolvableGenericType) {
+				$paramTags[$paramName] = new ParamTag($type->resolveGenericType($genericTypesMap), $paramTag->isVariadic());
+			}
+		}
+
+		$genericTags = $this->genericTags;
+		foreach ($genericTags as $genericName => $genericTag) {
+			$type = $genericTag->getConstraint();
+			if ($type instanceof ResolvableGenericType) {
+				$genericTags[$genericName] = new GenericTag(
+					$type->resolveGenericType($genericTypesMap),
+					$genericTag->getConstraintType(),
+					$genericTag->getVarianceType()
+				);
+			}
+		}
+
+		$inheritTags = $this->inheritTags;
+		foreach ($inheritTags as $classType => $inheritTag) {
+			$types = $inheritTag->getGenericTypes();
+			foreach ($types as $i => $type) {
+				if ($type instanceof ResolvableGenericType) {
+					$types[$i] = $type->resolveGenericType($genericTypesMap);
+				}
+			}
+			$inheritTags[$classType] = new InheritTag($inheritTag->getInheritanceType(), $types);
+		}
+
+		$returnTag = $this->returnTag;
+		if ($returnTag !== null) {
+			$type = $returnTag->getType();
+			if ($type instanceof ResolvableGenericType) {
+				$returnTag = new ReturnTag($type->resolveGenericType($genericTypesMap));
+			}
+		}
+
+		return self::create(
+			$varTags,
+			$methodTags,
+			$propertyTags,
+			$paramTags,
+			$genericTags,
+			$inheritTags,
+			$returnTag
+		);
+	}
+
 
 	public static function __set_state(array $properties): self
 	{
@@ -123,6 +266,8 @@ class ResolvedPhpDocBlock
 			$properties['methodTags'],
 			$properties['propertyTags'],
 			$properties['paramTags'],
+			$properties['genericTags'],
+			$properties['inheritTags'],
 			$properties['returnTag']
 		);
 	}

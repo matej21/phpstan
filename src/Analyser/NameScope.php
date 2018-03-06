@@ -20,17 +20,43 @@ class NameScope
 	 */
 	private $className;
 
-	public function __construct(string $namespace = null, array $uses = [], string $className = null)
+	/**
+	 * @var array|null
+	 */
+	private $genericTypeNames;
+
+
+	public function __construct(string $namespace = null, array $uses = [], string $className = null, array $genericTypeNames = null)
 	{
 		$this->namespace = $namespace;
 		$this->uses = $uses;
 		$this->className = $className;
+		$this->genericTypeNames = $genericTypeNames;
 	}
 
 	public function getClassName(): ?string
 	{
 		return $this->className;
 	}
+
+
+	public function hasGenericTypeNames(): bool
+	{
+		return $this->genericTypeNames !== null;
+	}
+
+
+	public function withGenericTypeNames(array $genericTypeNames): self
+	{
+		return new self($this->namespace, $this->uses, $this->className, $genericTypeNames);
+	}
+
+
+	public function isGenericType(string $name): bool
+	{
+		return in_array($name, $this->genericTypeNames ?? [], true);
+	}
+
 
 	public function resolveStringName(string $name): string
 	{

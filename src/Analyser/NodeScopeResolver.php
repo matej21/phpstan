@@ -626,7 +626,8 @@ class NodeScopeResolver
 			$this->anonymousClassReflection = $this->broker->getClassFromReflection(
 				$classReflection,
 				sprintf('class@anonymous%s:%s', $scope->getFile(), $node->getLine()),
-				true
+				true,
+				[]
 			);
 		} elseif ($node instanceof BooleanNot) {
 			$scope = $scope->enterNegation();
@@ -1152,7 +1153,7 @@ class NodeScopeResolver
 	{
 		$resolvedPhpDoc = $this->fileTypeMapper->getResolvedPhpDoc(
 			$scope->getFile(),
-			$scope->isInClass() ? $scope->getClassReflection()->getName() : null,
+			$scope->isInClass() ? $scope->getClassReflection() : null,
 			$comment
 		);
 		$varTags = $resolvedPhpDoc->getVarTags();
@@ -1510,7 +1511,7 @@ class NodeScopeResolver
 		if ($functionLike->getDocComment() !== null) {
 			$docComment = $functionLike->getDocComment()->getText();
 			$file = $scope->getFile();
-			$class = $scope->isInClass() ? $scope->getClassReflection()->getName() : null;
+			$class = $scope->isInClass() ? $scope->getClassReflection() : null;
 			if ($functionLike instanceof Node\Stmt\ClassMethod) {
 				$phpDocBlock = PhpDocBlock::resolvePhpDocBlockForMethod(
 					$this->broker,
@@ -1521,7 +1522,7 @@ class NodeScopeResolver
 				);
 				$docComment = $phpDocBlock->getDocComment();
 				$file = $phpDocBlock->getFile();
-				$class = $phpDocBlock->getClass();
+				$class = Broker::getInstance()->getClass($phpDocBlock->getClass());
 			}
 
 			$resolvedPhpDoc = $this->fileTypeMapper->getResolvedPhpDoc(

@@ -8,6 +8,7 @@ use PHPStan\Cache\Cache;
 use PHPStan\Parser\Parser;
 use PHPStan\PhpDoc\PhpDocStringResolver;
 use PHPStan\PhpDoc\ResolvedPhpDocBlock;
+use PHPStan\Reflection\ClassReflection;
 
 class FileTypeMapper
 {
@@ -38,9 +39,9 @@ class FileTypeMapper
 		$this->cache = $cache;
 	}
 
-	public function getResolvedPhpDoc(string $fileName, string $className = null, string $docComment): ResolvedPhpDocBlock
+	public function getResolvedPhpDoc(string $fileName, ClassReflection $classReflection = null, string $docComment, bool $tryResolveGeneric = true): ResolvedPhpDocBlock
 	{
-		$phpDocKey = md5($className . $docComment);
+		$phpDocKey = md5(($classReflection ? $classReflection->getName() : '') . $docComment);
 		$phpDocMap = [];
 
 		if (!isset($this->inProcess[$fileName])) {
@@ -48,7 +49,11 @@ class FileTypeMapper
 		}
 
 		if (isset($phpDocMap[$phpDocKey])) {
-			return $phpDocMap[$phpDocKey];
+			if ($tryResolveGeneric) {
+				return $this->resolveGenericTypes($phpDocMap[$phpDocKey], $classReflection);
+			} else {
+				return $phpDocMap[$phpDocKey];
+			}
 		}
 
 		if (!isset($this->inProcess[$fileName][$phpDocKey])) { // wrong $fileName due to traits
@@ -66,6 +71,9 @@ class FileTypeMapper
 		}
 
 		assert($this->inProcess[$fileName][$phpDocKey] instanceof ResolvedPhpDocBlock);
+		if ($tryResolveGeneric) {
+			return $this->resolveGenericTypes($this->inProcess[$fileName][$phpDocKey], $classReflection);
+		}
 		return $this->inProcess[$fileName][$phpDocKey];
 	}
 
@@ -102,10 +110,11 @@ class FileTypeMapper
 		$classStack = [];
 		$namespace = null;
 		$uses = [];
+		$genericTypeNamesMap = [];
 
 		$this->processNodes(
 			$this->phpParser->parseFile($fileName),
-			function (\PhpParser\Node $node) use (&$phpDocMap, &$classStack, &$namespace, &$uses): void {
+			function (\PhpParser\Node $node) use (&$phpDocMap, &$classStack, &$namespace, &$uses, &$genericTypeNamesMap): void {
 				if ($node instanceof Node\Stmt\ClassLike) {
 					$classStack[] = ltrim(sprintf('%s\\%s', $namespace, $node->name), '\\');
 				} elseif ($node instanceof \PhpParser\Node\Stmt\Namespace_) {
@@ -139,11 +148,21 @@ class FileTypeMapper
 				}
 
 				$className = $classStack[count($classStack) - 1] ?? null;
-				$nameScope = new NameScope($namespace, $uses, $className);
+
+				$genericTypeNames = $node instanceof Node\Stmt\ClassLike ? null : $genericTypeNamesMap[$className] ?? [];
+				$nameScope = new NameScope($namespace, $uses, $className, $genericTypeNames);
 				$phpDocKey = md5($className . $phpDocString);
-				$phpDocMap[$phpDocKey] = function () use ($phpDocString, $nameScope): ResolvedPhpDocBlock {
-					return $this->phpDocStringResolver->resolve($phpDocString, $nameScope);
-				};
+				if ($node instanceof Node\Stmt\ClassLike) {
+					$phpDocBlock = $this->phpDocStringResolver->resolve($phpDocString, $nameScope);
+					$genericTypeNamesMap[$className] = array_keys($phpDocBlock->getGenericTags());
+					$phpDocMap[$phpDocKey] = function () use ($phpDocBlock): ResolvedPhpDocBlock {
+						return $phpDocBlock;
+					};
+				} else {
+					$phpDocMap[$phpDocKey] = function () use ($phpDocString, $nameScope): ResolvedPhpDocBlock {
+						return $this->phpDocStringResolver->resolve($phpDocString, $nameScope);
+					};
+				}
 			},
 			function (\PhpParser\Node $node) use (&$namespace, &$classStack, &$uses): void {
 				if ($node instanceof Node\Stmt\ClassLike) {
@@ -193,6 +212,17 @@ class FileTypeMapper
 				$this->processNodes($subNode, $nodeCallback, $endNodeCallback);
 			}
 		}
+	}
+
+
+	private function resolveGenericTypes(ResolvedPhpDocBlock $phpDocBlock, ?ClassReflection $classReflection): ResolvedPhpDocBlock
+	{
+		if ($classReflection === null) {
+			return $phpDocBlock;
+		}
+		$genericTypesMap = $classReflection->getGenericTypesMap();
+
+		return $phpDocBlock->resolveGenericTypes($genericTypesMap);
 	}
 
 }

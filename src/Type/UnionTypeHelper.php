@@ -69,4 +69,21 @@ class UnionTypeHelper
 		return $types;
 	}
 
+
+	/**
+	 * @param \PHPStan\Type\Type[] $genericTypesMap
+	 * @param \PHPStan\Type\Type[] $types
+	 * @return \PHPStan\Type\Type[]
+	 */
+	public static function resolveGenericTypes(array $genericTypesMap, array $types): array
+	{
+		foreach ($types as $i => $type) {
+			if ($type instanceof ResolvableGenericType) {
+				$types[$i] = $type->resolveGenericType($genericTypesMap);
+			}
+		}
+
+		return $types;
+	}
+
 }

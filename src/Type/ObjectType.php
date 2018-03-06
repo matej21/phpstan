@@ -55,6 +55,11 @@ class ObjectType implements TypeWithClassName
 			return $this->checkSubclassAcceptability($type->getBaseClass());
 		}
 
+		if ($type instanceof UnresolvedGenericType) {
+			$constraint = $type->getConstraint();
+			return $constraint ? $this->accepts($constraint) : false;
+		}
+
 		if ($type instanceof CompoundType) {
 			return CompoundTypeHelper::accepts($type, $this);
 		}

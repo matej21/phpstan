@@ -131,6 +131,9 @@ services:
 		class: PHPStan\Reflection\Annotations\AnnotationsPropertiesClassReflectionExtension
 
 	-
+		class: PHPStan\Reflection\Annotations\AnnotationsGenericClassReflectionExtension
+
+	-
 		class: PHPStan\Reflection\Php\PhpClassReflectionExtension
 
 	-

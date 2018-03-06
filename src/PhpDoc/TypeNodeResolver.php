@@ -18,6 +18,7 @@ use PHPStan\Type\CallableType;
 use PHPStan\Type\Constant\ConstantBooleanType;
 use PHPStan\Type\ErrorType;
 use PHPStan\Type\FloatType;
+use PHPStan\Type\GenericObjectType;
 use PHPStan\Type\IntegerType;
 use PHPStan\Type\IntersectionType;
 use PHPStan\Type\IterableType;
@@ -34,6 +35,7 @@ use PHPStan\Type\Type;
 use PHPStan\Type\TypeCombinator;
 use PHPStan\Type\TypeWithClassName;
 use PHPStan\Type\UnionType;
+use PHPStan\Type\UnresolvedGenericType;
 use PHPStan\Type\VoidType;
 
 class TypeNodeResolver
@@ -127,6 +129,10 @@ class TypeNodeResolver
 
 			case 'object':
 				return new ObjectWithoutClassType();
+		}
+
+		if ($nameScope->isGenericType($typeNode->name)) {
+			return new UnresolvedGenericType($nameScope->getClassName(), $typeNode->name);
 		}
 
 		if ($nameScope->getClassName() !== null) {
@@ -248,6 +254,7 @@ class TypeNodeResolver
 			} elseif (count($genericTypes) === 2) { // array<KeyType, ValueType>
 				return new ArrayType($genericTypes[0], $genericTypes[1]);
 			}
+			return new ErrorType();
 
 		} elseif ($mainType === 'iterable') {
 			if (count($genericTypes) === 1) { // iterable<ValueType>
@@ -256,9 +263,14 @@ class TypeNodeResolver
 			} elseif (count($genericTypes) === 2) { // iterable<KeyType, ValueType>
 				return new IterableType($genericTypes[0], $genericTypes[1]);
 			}
+			return new ErrorType();
+		}
+		$objectType = $this->resolveIdentifierTypeNode($typeNode->type, $nameScope);
+		if (!$objectType instanceof TypeWithClassName) {
+			return new ErrorType();
 		}
 
-		return new ErrorType();
+		return new GenericObjectType($objectType, $genericTypes);
 	}
 
 	/**

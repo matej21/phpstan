@@ -46,6 +46,9 @@ class Foo
 		/** @var static $static */
 		$static = getFoo();
 
+		/** @var Collection<Product> $generic */
+		$generic = getFoo();
+
 		die;
 	}
 
@@ -89,6 +92,9 @@ class Foo
 
 		/** @var static */
 		$static = getFoo();
+
+		/** @var Collection<Product> */
+		$generic = getFoo();
 
 		die;
 	}

@@ -32,6 +32,14 @@ class PhpDocStringResolver
 		$phpDocNode = $this->phpDocParser->parse($tokens);
 		$tokens->consumeTokenType(Lexer::TOKEN_END);
 
+		if (!$nameScope->hasGenericTypeNames()) {
+			$genericTagNames = [];
+			foreach ($phpDocNode->getGenericTagValues() as $tagName => $tagValue) {
+				$genericTagNames[] = $tagName;
+			}
+			$nameScope = $nameScope->withGenericTypeNames($genericTagNames);
+		}
+
 		return $this->phpDocNodeResolver->resolve($phpDocNode, $nameScope);
 	}
 

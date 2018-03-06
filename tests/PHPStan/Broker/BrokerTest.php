@@ -26,6 +26,7 @@ class BrokerTest extends \PHPStan\Testing\TestCase
 			[],
 			[],
 			[],
+			[],
 			$this->createMock(FunctionReflectionFactory::class),
 			new FileTypeMapper($this->getParser(), $phpDocStringResolver, $this->createMock(Cache::class)),
 			new FunctionDumper()

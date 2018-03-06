@@ -7,6 +7,9 @@ use PHPStan\Broker\Broker;
 use PHPStan\Reflection\Php\PhpClassReflectionExtension;
 use PHPStan\Reflection\Php\PhpMethodReflection;
 use PHPStan\Reflection\Php\PhpPropertyReflection;
+use PHPStan\Type\IntersectionType;
+use PHPStan\Type\MixedType;
+use PHPStan\Type\Type;
 
 class ClassReflection
 {
@@ -19,6 +22,9 @@ class ClassReflection
 
 	/** @var \PHPStan\Reflection\MethodsClassReflectionExtension[] */
 	private $methodsClassReflectionExtensions;
+
+	/** @var \PHPStan\Reflection\GenericClassReflectionExtension[] */
+	private $genericTypesReflectionExtensions;
 
 	/** @var string */
 	private $displayName;
@@ -38,24 +44,35 @@ class ClassReflection
 	/** @var \PHPStan\Reflection\ClassConstantReflection[] */
 	private $constants;
 
+	/** @var null|GenericClassReflection */
+	private $genericClassReflection;
+
 	/** @var int[]|null */
 	private $classHierarchyDistances;
+
+	/** @var Type[] */
+	private $genericTypes;
+
 
 	public function __construct(
 		Broker $broker,
 		array $propertiesClassReflectionExtensions,
 		array $methodsClassReflectionExtensions,
+		array $genericTypesReflectionExtensions,
 		string $displayName,
 		\ReflectionClass $reflection,
-		bool $anonymous
+		bool $anonymous,
+		array $genericTypes = []
 	)
 	{
 		$this->broker = $broker;
 		$this->propertiesClassReflectionExtensions = $propertiesClassReflectionExtensions;
 		$this->methodsClassReflectionExtensions = $methodsClassReflectionExtensions;
+		$this->genericTypesReflectionExtensions = $genericTypesReflectionExtensions;
 		$this->displayName = $displayName;
 		$this->reflection = $reflection;
 		$this->anonymous = $anonymous;
+		$this->genericTypes = $genericTypes;
 	}
 
 	public function getNativeReflection(): \ReflectionClass
@@ -304,6 +321,24 @@ class ClassReflection
 		}, $this->getNativeReflection()->getTraits());
 	}
 
+
+	/**
+	 * @return \PHPStan\Reflection\ClassReflection[]
+	 */
+	public function getSuperTypes(string $type): array
+	{
+		if ($type === $this->getName()) {
+			return [$this];
+		}
+		if (!$this->isSubclassOf($type)) {
+			throw new \Exception(); //todo
+		}
+		if (count($this->genericTypes) === 0) {
+			return [$this->broker->getClass($type)];
+		}
+		throw new \LogicException('todo');
+	}
+
 	/**
 	 * @return string[]
 	 */
@@ -353,4 +388,55 @@ class ClassReflection
 		return $traitNames;
 	}
 
+
+	/**
+	 * @return GenericTypeReflection[]
+	 */
+	public function getGenericTypeReflections(): array
+	{
+		return $this->getGenericClassReflection()->getGenericTypes();
+	}
+
+
+	/**
+	 * @return Type[]
+	 */
+	public function getGenericTypes(): array
+	{
+		return $this->genericTypes;
+	}
+
+
+	public function getGenericClassReflection(): GenericClassReflection
+	{
+		if ($this->genericClassReflection === null) {
+			$this->genericTypeReflections = [];
+			foreach ($this->genericTypesReflectionExtensions as $extension) {
+				$reflection = $extension->getGenericClassReflection($this);
+				if ($reflection !== null) {
+					$this->genericClassReflection = $reflection;
+					break;
+				}
+			}
+		}
+		if($this->genericClassReflection === null) {
+			$this->genericClassReflection = new GenericClassReflection([], []);
+		}
+		return $this->genericClassReflection;
+	}
+
+
+	/**
+	 * @return Type[]
+	 */
+	public function getGenericTypesMap(): array
+	{
+		$genericTypesMap = [];
+		$genericTypes = $this->genericTypes;
+		foreach ($this->getGenericTypeReflections() as $i => $reflection) {
+			$type = $genericTypes[$i] ?? $reflection->getDefaultType() ?? null;
+			$genericTypesMap[$reflection->getName()] = $type;
+		}
+		return $genericTypesMap;
+	}
 }
